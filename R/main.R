@@ -1,4 +1,5 @@
 library(patchwork)
+library(tidyverse)
 library(tidyr)
 library(purrr) #map, map2, pmap
 library(emmeans) #emmans, contrast
@@ -711,7 +712,7 @@ regsp =
   sp.scores %>%
   filter(pool %in% c("colonizing", "overlapping", "strictly_high_elevation"))%>%
   left_join(regmeta, by = c("Region","destSiteID"))%>%
-  left_join(clim, by = c("Region", "originSiteID","destSiteID"))
+  left_join(clim %>% mutate(across(destP:cumsumT, ~as.numeric(scale(., center = TRUE, scale = TRUE)))), by = c("Region", "originSiteID","destSiteID"))
 
 mf = as.formula("emmean~
                 PlotSize + YearRange + 
@@ -725,7 +726,7 @@ regspmod =
   unnest(data)
 
 pdf("plot/experimental_effects_pools.pdf", height = 11, width = 10)
-regspmod %>%
+pp1= regspmod %>%
   filter(rowname != "(Intercept)")%>%
   mutate(pool = recode(pool, overlapping = "Overlapping",
                        colonizing = "Colonizing",
@@ -758,10 +759,60 @@ regspmod %>%
   scale_color_manual(values = c( "#ff7f00", "#d25fff","#197af6"))+
   guides(color = guide_legend(order = 1, ncol = 1),
          alpha = guide_legend(order = 2, ncol = 1))+
-  labs(y = "", x = "Effect sizes", alpha = "", color = "Species pools")
+  labs(y = "", x = "Effect sizes", alpha = "", color = "Species pools")+
+  theme(strip.text = ggplot2::element_text(size  = 14,  hjust = 0))
+pp1
 dev.off()
 
-regspmod =
+pdf("plot/experimental_effects_pools_scatter.pdf", height = 10, width = 8)
+
+pp2=regsp %>%
+  select(Region, originSiteID, destSiteID, pool, change, emmean,
+         YearRange, PlotSize, cumsumT, destT, destP, 
+         plant_size, resource_acquisition)%>%
+  pivot_longer(cols = YearRange:resource_acquisition, names_to = "rowname")%>%
+  left_join(regspmod, by = c("pool","change","rowname"))%>%
+  filter(rowname != "(Intercept)")%>%
+  mutate(pool = recode(pool, overlapping = "Overlapping",
+                       colonizing = "Colonizing",
+                       strictly_high_elevation = "Strictly \nhigh elevation"))%>%
+  mutate(var = recode(rowname, PlotSize = "Turf size",
+                      YearRange = "Experiment duration",
+                      cumsumT = "Experimental warming",
+                      destP = "Destination PET",
+                      destT = "Destination temperature",
+                      plant_size = "Plant size traits",
+                      resource_acquisition = "Resource acquisition traits"))%>%
+  mutate(type = case_when(var %in% c("Turf size", "Experiment duration", "Experimental warming") ~ "Experimental effects",
+                          var %in% c("Destination PET","Destination temperature")~"Climate effects",
+                          var %in% c("Plant size traits","Resource acquisition traits")~"Functional effects"))%>%
+  mutate(type = factor(type, levels = c("Experimental effects","Climate effects","Functional effects")))%>%
+  mutate(var = factor(var, levels = c("Plant size traits","Resource acquisition traits",
+                                      "Destination PET","Destination temperature","Experimental warming",
+                                      "Turf size","Experiment duration")))%>%
+  mutate(pval = factor(pval, levels = c("non-significant","*","**", "***")))%>%
+  mutate(change = factor(change, levels = c("Distance to origin controls","Distance to destination controls")))%>%
+  ggplot(aes(value, emmean, color = pool, alpha = pval, group = interaction(var, pool, pval)))+
+  TP_theme()+
+  geom_point(size = 0.8)+
+  stat_smooth(fullrange = TRUE, method = "lm", geom = "line", se = FALSE, show.legend = FALSE, linewidth = 1.2)+
+  facet_grid(type~change)+
+  scale_alpha_manual(values = c(0.2, 0.7, 1))+
+  scale_color_manual(values = c( "#ff7f00", "#d25fff","#197af6"))+
+  labs(y = "Average species weights", x = "Values of independent factors",
+       color = "Species pools",
+       alpha = "")+
+  guides(color = guide_legend(order = 1, ncol = 1),
+         alpha = guide_legend(order = 2, ncol = 1))+
+  theme(strip.text = ggplot2::element_text(size  = 14,  hjust = 0))
+pp2
+dev.off()  
+
+pdf("plot/experimental_effects_pools_merged.pdf", height = 10, width = 16)
+ggarrange(pp1, pp2, widths = c(1.1, 0.9), common.legend = TRUE, legend = "bottom")
+dev.off()
+
+regsptab =
   regspmod %>%
   mutate(var = recode(rowname, 
                       `(Intercept)` = "Intercept",
@@ -774,15 +825,16 @@ regspmod =
                       oriRA = "Origin CWM (resource acquisition)",
                       destPS = "Destination CWM (plant size)",
                       destRA = "Destination CWM (resource acquisition)"))
-regspmod1 = regspmod %>% select(change, pool, var, Estimate, `Std. Error`, `t value`,  
+regspmod1 = regsptab %>% select(change, pool, var, Estimate, `Std. Error`, `t value`,  
                                 `2.5 %`, `97.5 %`, `Pr(>|t|)`)%>%
   mutate_if(is.numeric, ~ ifelse(is.na(.), NA, round(., 2)))
 
-regspmod2 = regspmod %>% select(change, pool, R, Radj, F.stat, numdf, dendf, p.value)%>%distinct()%>%
+regspmod2 = regsptab %>% select(change, pool, R, Radj, F.stat, numdf, dendf, p.value)%>%distinct()%>%
   mutate_if(is.numeric, ~ ifelse(is.na(.), NA, round(., 2)))
 
 write.csv (regspmod1, file = "plot/regspmod1.csv")
 write.csv (regspmod2, file = "plot/regspmod2.csv")
+
 
 # PRC example experiment ----
 i = 1
