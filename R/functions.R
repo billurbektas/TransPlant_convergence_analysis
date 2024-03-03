@@ -2,15 +2,15 @@
 get.PRC = function(data, sel.ODT, sel.control){
 data =
   data %>%
-  mutate(comm_meta = map(comm_wide, ~{.} %>% 
+  mutate(comm_meta = purrr::map(comm_wide, ~{.} %>% 
                                filter(ODT %in% sel.ODT) %>%
-                               select(ODT, destPlotID, Year)))%>%
-  mutate(comm_spp = map(comm_wide, ~{.} %>% 
+                               dplyr::select(ODT, destPlotID, Year)))%>%
+  mutate(comm_spp = purrr::map(comm_wide, ~{.} %>% 
                               filter(ODT %in% sel.ODT) %>%
-                              select(-ODT, -destPlotID, -Year)))%>%
+                              dplyr::select(-ODT, -destPlotID, -Year)))%>%
   dplyr::select(-comm_wide, -comm)%>%
-  mutate(comm_spp = map(comm_spp, ~ sqrt(.x)))%>%
-  select(Region, originSiteID,destSiteID, comm_meta, comm_spp)%>%
+  mutate(comm_spp = purrr::map(comm_spp, ~ sqrt(.x)))%>%
+  dplyr::select(Region, originSiteID,destSiteID, comm_meta, comm_spp)%>%
   unnest_wider(comm_meta)%>%
   # Get the principal response curves to determine the change from the selected controls
    mutate(PRC = pmap(.l = list(ODT=ODT, Year=Year, destPlotID = destPlotID, comm_spp=comm_spp), 
@@ -74,7 +74,7 @@ data =
 return(data)
 }
 
-get.perm = function(data){
+get.perm = function(data, set.nperm){
   data =
   data %>%
   mutate(perm = pmap(.l = list(ODT=ODT, Year=Year, destPlotID = destPlotID, comm_spp = comm_spp, PRC = PRC, sel.control = sel.control),
@@ -87,11 +87,11 @@ get.perm = function(data){
                        assign("destPlotID", destPlotID, envir = .GlobalEnv)
                        assign("comm_spp", comm_spp, envir = .GlobalEnv)
                        ctrl = how(plots = Plots(strata = destPlotID, type = "free"),
-                                  within = Within(type = "none"), nperm = 999)
+                                  within = Within(type = "none"), nperm = set.nperm)
                        res = anova(PRC, permutations = ctrl, by = "axis")
                        return(res)}
   ))
-  data = data %>% select(Region, originSiteID, destSiteID, change, type, sel.control, perm)
+  data = data %>% dplyr::select(Region, originSiteID, destSiteID, change, type, sel.control, perm)
   return(data)
 }
 
@@ -117,7 +117,7 @@ get.PRC.plot = function(data, changex, typex, axisx, sel.col){
                                   title = paste0(Region, " (Origin: ", originSiteID, " Destination: ", destSiteID,")" ),
                                   subtitle = changex)+
                              ylim(-1,1)}))%>%
-  select(Region, originSiteID, destSiteID, plot.prc)
+  dplyr::select(Region, originSiteID, destSiteID, plot.prc)
 )
 }
 
@@ -138,7 +138,7 @@ get.sp.scores.plot = function(data, changex, typex, axisx, sel.col){
                                       title = paste0(Region, " (Origin: ", originSiteID, " Destination: ", destSiteID,")" ),
                                       subtitle = changex)+
                                  ylim(-1,1)}))%>%
-      select(Region, originSiteID, destSiteID, plot.sp)
+      dplyr::select(Region, originSiteID, destSiteID, plot.sp)
   )
 }
 
@@ -166,7 +166,7 @@ get.clim = function(sites, climdata){
     climdata%>%
     ungroup()%>%
     filter(var != "precipitation")%>%
-    select(gradient, destSiteID, year, month, var, value)%>%
+    dplyr::select(gradient, destSiteID, year, month, var, value)%>%
     filter(!(var == "temperature" & !month %in% c(6:8)))%>%
     pivot_wider(values_from = value, names_from = var)%>%
     group_by(gradient, destSiteID, year)%>%
@@ -180,30 +180,26 @@ get.clim = function(sites, climdata){
   clim = 
     bind_rows(clim %>% right_join(sites %>% 
                                     ungroup() %>% 
-                                    select(Region, destSiteID, Year) %>% 
+                                    dplyr::select(Region, destSiteID, Year) %>% 
                                     rename(site = destSiteID)%>%
                                     distinct, 
                                   by = c("Region","site", "Year")),
               clim %>% right_join(sites %>% 
                                     ungroup() %>% 
-                                    select(Region, originSiteID, Year) %>% 
+                                    dplyr::select(Region, originSiteID, Year) %>% 
                                     rename(site = originSiteID)%>%
                                     distinct, 
                                   by = c("Region","site", "Year")))%>%
     distinct()%>%
     na.omit()%>% #We do not have climate data for 2020-2021
     ungroup()
-  # if(is.scale){
-  #   clim = clim %>%
-  #     mutate(temperature = as.numeric(scale(temperature, center = TRUE, scale = TRUE)),
-  #            pet = as.numeric(scale(pet, center = TRUE, scale = TRUE)))
-  # }else{clim = clim}
+  
   destclim =
     clim %>%
     rename(destSiteID = site)%>%
     right_join(sites %>% 
                  ungroup() %>% 
-                 select(Region, destSiteID, Year) %>% 
+                 dplyr::select(Region, destSiteID, Year) %>% 
                  distinct, 
                by = c("Region","destSiteID", "Year"))%>%
     rename(dest_pet = pet,
@@ -214,7 +210,7 @@ get.clim = function(sites, climdata){
     rename(originSiteID = site)%>%
     right_join(sites %>% 
                  ungroup() %>% 
-                 select(Region, originSiteID, Year) %>% 
+                 dplyr::select(Region, originSiteID, Year) %>% 
                  distinct, 
                by = c("Region","originSiteID", "Year"))%>%
     rename(ori_pet = pet,
@@ -223,13 +219,13 @@ get.clim = function(sites, climdata){
   distclim =
     sites %>% 
     ungroup() %>% 
-    select(Region, destSiteID, originSiteID, Year) %>% 
+    dplyr::select(Region, destSiteID, originSiteID, Year) %>% 
     distinct()%>%
     left_join(destclim, by = c("Region", "destSiteID", "Year"))
   
   distclim =
     distclim %>%
-    left_join(oriclim %>% select(Region, originSiteID, Year, 
+    left_join(oriclim %>% dplyr::select(Region, originSiteID, Year, 
                                  ori_pet, ori_temperature), by = c("Region", "Year","originSiteID"))
   
   distclim = 
