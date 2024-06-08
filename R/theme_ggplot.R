@@ -21,7 +21,7 @@ TP_theme <- function() {
                                          size=14,
                                          color="#222222"),
     legend.text = ggplot2::element_text(family=font,
-                                        size=12,
+                                        size=16,
                                         color="#222222"),
     axis.title = ggplot2::element_text(family=font,
                                        size=16,
