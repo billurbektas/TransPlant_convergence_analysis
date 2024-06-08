@@ -144,21 +144,32 @@ get.sp.scores.plot = function(data, changex, typex, axisx, sel.col){
 
 # LM----
 get.mod = function(data, mf){
-  m1 = lm(mf, data)
-  m1sum = as.data.frame(cbind(summary(m1)$coefficients, confint(m1)))%>%
-    rownames_to_column()%>%
+  m1 = rma(yi = response, sei = SE, mods = mf, data = data)
+  m1sum = tidy(m1, conf.int = TRUE)%>%
     as.tibble()%>%
-    mutate(pval = pval(`Pr(>|t|)`))%>%
-    mutate(R = summary(m1)$r.squared, 
-           Radj = summary(m1)$adj.r.squared,
-           F.stat = summary(m1)$fstatistic[1],
-           numdf = summary(m1)$fstatistic[2],
-           dendf = summary(m1)$fstatistic[3],
-           p.value = pf(F.stat, numdf, dendf)
-           
-    )
+    mutate(pval = pval(p.value))%>%
+    mutate(pval = ifelse(pval == "non-significant", "", pval))%>%
+    bind_cols(glance(m1))%>%
+    dplyr::select(-type)
   return(m1sum)
 }
+pred.mod = function(data, mf) {
+  m1 = rma(yi = response, sei = SE, mods = mf, data = data)
+  moderators = all.vars(mf) # Get moderator names (excluding response variable)
+  
+  predictions = map_df(moderators, function(moderator) {
+    newmods = matrix(0, nrow = length(seq(-2, 2, 0.1)), ncol = length(moderators))
+    colnames(newmods) = moderators
+    newmods[, moderator] = seq(-2, 2, 0.1)
+    
+    pred = predict(m1, newmods = newmods)
+    as_tibble(pred) %>%
+      mutate(moderator = moderator, value = seq(-2, 2, 0.1))
+  })
+  
+  return(predictions)
+}
+
 
 # ORGANIZE climate data -----
 get.clim = function(sites, climdata){
