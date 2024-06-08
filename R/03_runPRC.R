@@ -20,22 +20,6 @@ PRC = bind_rows(get.PRC(data = dfx, sel.ODT = c("warmed","originControls","destC
                 get.PRC(data = dfx, sel.ODT = c("warmed","originControls","destControls"), sel.control = "destControls") %>%
                   mutate(change = "Distance to destination controls",
                          type = "all",
-                         sel.control = "destControls"),
-                get.PRC(data = dfx, sel.ODT = c("warmed","originControls"), sel.control = "originControls") %>%
-                  mutate(change = "Distance to origin controls",
-                         type = "reduced_treatment",
-                         sel.control = "originControls"),
-                get.PRC(data = dfx, sel.ODT = c("warmed","destControls"), sel.control = "destControls") %>%
-                  mutate(change = "Distance to destination controls",
-                         type = "reduced_treatment",
-                         sel.control = "destControls"),
-                get.PRC(data = dfx, sel.ODT = c("originControls","destControls"), sel.control = "originControls") %>%
-                  mutate(change = "Distance to origin controls",
-                         type = "reduced_controls",
-                         sel.control = "originControls"),
-                get.PRC(data = dfx, sel.ODT = c("originControls","destControls"), sel.control = "destControls") %>%
-                  mutate(change = "Distance to destination controls",
-                         type = "reduced_controls",
                          sel.control = "destControls"))
 ## Get PRC figures per experiment ----
 gg1 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = "all", axisx = 1, sel.col = c("#ff7f00","#ff0000"))
@@ -43,31 +27,18 @@ gg2 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = 
 gg3 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "all", axisx = 1, sel.col = c("#197af6","#ff0000"))
 gg4 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "all", axisx = 2, sel.col = c("#197af6","#ff0000"))
 
-gg5 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = "reduced_treatment", axisx = 1, sel.col = c("#ff0000"))
-gg6 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = "reduced_treatment", axisx = 2, sel.col = c("#ff0000"))
-gg7 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "reduced_treatment", axisx = 1, sel.col = c("#ff0000"))
-gg8 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "reduced_treatment", axisx = 2, sel.col = c("#ff0000"))
-
 # Sp scores
 ss1 = get.sp.scores.plot(data = PRC, changex = "Distance to origin controls", typex = "all", axisx = 1, sel.col = "grey50")
 ss2 = get.sp.scores.plot(data = PRC, changex = "Distance to origin controls", typex = "all", axisx = 2, sel.col = "grey50")
 ss3 = get.sp.scores.plot(data = PRC, changex = "Distance to destination controls", typex = "all", axisx = 1, sel.col = "grey50")
 ss4 = get.sp.scores.plot(data = PRC, changex = "Distance to destination controls", typex = "all", axisx = 2, sel.col = "grey50")
 
-ss5 = get.sp.scores.plot(data = PRC, changex = "Distance to origin controls", typex = "reduced_treatment", axisx = 1, sel.col = c("#ff0000"))
-ss6 = get.sp.scores.plot(data = PRC, changex = "Distance to origin controls", typex = "reduced_treatment", axisx = 2, sel.col = c("#ff0000"))
-ss7 = get.sp.scores.plot(data = PRC, changex = "Distance to destination controls", typex = "reduced_treatment", axisx = 1, sel.col = c("#ff0000"))
-ss8 = get.sp.scores.plot(data = PRC, changex = "Distance to destination controls", typex = "reduced_treatment", axisx = 2, sel.col = c("#ff0000"))
-
 pdf(file = here("plot", "experiment_PRCs.pdf"), height = 12, width = 15)
 for(i in 1:40){
   
   print((gg1[["plot.prc"]][[i]]+gg3[["plot.prc"]][[i]])/(gg2[["plot.prc"]][[i]]+gg4[["plot.prc"]][[i]]))
   print((ss1[["plot.sp"]][[i]]+ss3[["plot.sp"]][[i]])/(ss2[["plot.sp"]][[i]]+ss4[["plot.sp"]][[i]]))
-  
-  print((gg5[["plot.prc"]][[i]]+gg7[["plot.prc"]][[i]])/(gg6[["plot.prc"]][[i]]+gg8[["plot.prc"]][[i]]))
-  print((ss5[["plot.sp"]][[i]]+ss7[["plot.sp"]][[i]])/(ss6[["plot.sp"]][[i]]+ss8[["plot.sp"]][[i]]))
-}
+  }
 dev.off()
 
 ## RUN permutation tests ----
