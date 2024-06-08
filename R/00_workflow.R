@@ -16,6 +16,7 @@ library(factoextra)
 library(FactoMineR)
 library(merTools) #predictInterval
 library(paran)
+library(metafor) #rma
 
 # Create subfolders
 if(!dir.exists(here("plot"))){dir.create(here("plot"))}
@@ -40,6 +41,8 @@ source(here("R", "03_runPRC.R"))
 ## Get slopes per experiment, build linear models, build figures for the paper
 source(here("R", "04_rates.R"))
 
+emm_options(pbkrtest.limit = 6000)
+emm_options(lmerTest.limit = 6000)
 # Species pool weights 
 source(here("R", "05_species_weights.R"))
 
