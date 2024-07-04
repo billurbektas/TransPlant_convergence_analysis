@@ -144,7 +144,7 @@ get.sp.scores.plot = function(data, changex, typex, axisx, sel.col){
 
 # LM----
 get.mod = function(data, mf){
-  m1 = rma(yi = response, sei = SE, mods = mf, data = data)
+  m1 = rma(yi = response, sei = SE, mods = mf, data = data, level = 97)
   m1sum = tidy(m1, conf.int = TRUE)%>%
     as.tibble()%>%
     mutate(pval = pval(p.value))%>%
@@ -154,7 +154,7 @@ get.mod = function(data, mf){
   return(m1sum)
 }
 pred.mod = function(data, mf) {
-  m1 = rma(yi = response, sei = SE, mods = mf, data = data)
+  m1 = rma(yi = response, sei = SE, mods = mf, data = data, level = 97)
   moderators = all.vars(mf) # Get moderator names (excluding response variable)
   
   predictions = map_df(moderators, function(moderator) {

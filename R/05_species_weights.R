@@ -46,17 +46,17 @@ sp.pred.w =
   filter(treatment =="warmed")%>%
   mutate(pred = purrr::map(data, ~{.} %>%
                              dplyr::select(Region, SpeciesName, experiment, change) %>%
-                             expand_grid(log_year_0 = c(seq(0,2.197225, 0.02), 2.197225))))%>%
+                             expand_grid(log_year_0 = c(seq(0,2.197225, 0.05), 2.197225))))%>%
   mutate(pred = map2(lmer.complete, pred, ~bind_cols(.y %>% dplyr::select(Region, SpeciesName, experiment, change, log_year_0),
-                                                     predictInterval(.x, newdata = as.data.frame(.y), n.sims = 1000, 
-                                                                     level = 0.95, type = "linear.prediction",
+                                                     predictInterval(.x, 
+                                                                     newdata = as.data.frame(.y), 
+                                                                     n.sims = nsim,
+                                                                     seed = nseed,
+                                                                     level = 0.95, 
+                                                                     type = "linear.prediction",
                                                                      which = "fixed",
                                                                      include.resid.var = FALSE,
-                                                                     .parallel = TRUE))))
-
-  
- 
-
+                                                                     .parallel = FALSE))))
 # sp.pred.c = 
 #   sp.lm %>%
 #   filter(treatment =="control")%>%
@@ -232,4 +232,4 @@ sp.lm %>%
   mutate(sign = sign(log_year_0.trend))%>%
   mutate(pval = ifelse(p.value<0.05, "s", "ns"))%>%
   group_by(axis, change, pool, pval, sign)%>%
-  summarize(n = n()) %>% View
+  summarize(n = n())

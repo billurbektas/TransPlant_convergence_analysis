@@ -67,6 +67,50 @@ reg = tax %>%
   left_join(regmeta, by = c("Region","destSiteID"))%>%
   dplyr::select(-oriP, -oriT, -diffP, -cumsumP, -cumsumT)
 
+pdf(file = "plot/experimental_variation.pdf", width = 16, height = 10)
+pvar = reg%>%
+    mutate(pool = recode(pool, overall = "community",
+                         strictly_high_elevation = "strictly high-elevation"))%>%
+    
+    mutate(pool = factor(pool, 
+                         levels = c("community", "strictly high-elevation", 
+                                    "overlapping", "colonizing")))%>%
+    mutate(type = factor(type, levels = c("start", "end","rate")))%>%
+  mutate(change = factor(change, levels = c("Distance to origin controls","Distance to destination controls")))
+pvar1=
+  pvar %>% filter(pool == "community")%>%
+ggplot(aes(type, response, color = pool))+
+  TP_theme()+
+  geom_hline(yintercept = 0, color = "grey50")+
+  geom_violin(fill = "white")+
+  geom_jitter(size = 0.9)+
+  facet_grid(change~pool, scales = "free")+
+  scale_color_manual(values = c("black"))+
+  labs(y = "Changes in warmed communities in comparison to controls", x = "", color = "")+
+  ylim(-0.35, 0.35)
+
+pvar2 =
+  pvar %>% filter(pool != "community")%>%
+  ggplot(aes(type, response, color = pool))+
+  TP_theme()+
+  geom_hline(yintercept = 0, color = "grey50")+
+  geom_violin(fill = "white")+
+  geom_jitter(size = 0.9)+
+  facet_grid(change~pool, scales = "free")+
+  scale_color_manual(values = c("#197af6", "#d25fff","#ff7f00"))+
+  labs(y = "Changes in warmed communities in comparison to controls", x = "", color = "")
+pvar = ggarrange(pvar1, pvar2, widths = c(0.5, 1.5))
+print(pvar)
+dev.off()
+
+# Summary table
+reg %>%
+  dplyr::select(change, experiment, pool, response, type)%>%
+  mutate(sign = sign(response))%>%
+  group_by(change, pool, type, sign)%>%
+  summarize(count = n()) %>% View
+
+
 mf = as.formula("~PlotSize + YearRange +
                 diffT + destP + destT +
                 destPS + destRA + 
@@ -179,9 +223,10 @@ p.reg =
 p1=
 p.reg%>%
   filter(type %in% c("start", "end"))%>%
+  filter(pval!= "")%>%
   mutate(change = ifelse(change == "Distance to origin controls", "In comparison to \norigin controls", "In comparison to \ndestination controls"))%>%
   mutate(change = factor(change, levels = c("In comparison to \norigin controls", "In comparison to \ndestination controls")))%>%
-  ggplot(aes(explanatory, response, color = pool, alpha = pval, group = interaction(var, pool, pval)))+
+  ggplot(aes(explanatory, response, color = pool, group = interaction(var, pool)))+
   TP_theme()+
   geom_hline(yintercept = 0, color = "grey20")+
   geom_point(size = 0.8)+
@@ -193,7 +238,7 @@ p.reg%>%
             linewidth = 1.2)+
   #stat_smooth(fullrange = TRUE, method = "lm", geom = "line", se = FALSE, show.legend = TRUE, linewidth = 1.2)+
   facet_nested(typex~change+type, scales= "free_x")+
-  scale_alpha_manual(values = c(0.2, 1, 1, 1))+
+  scale_alpha_manual(values = c(0.1, 1, 1, 1))+
   scale_color_manual(values = c( "#ff7f00", "#d25fff","#197af6"))+
   labs(y = "Proportional change in warmed communities", x = "Values of independent factors",
        color = "Species pools",
@@ -227,24 +272,22 @@ regmod %>%
   theme(axis.text.x = element_text(size =12))+theme(strip.text = ggplot2::element_text(size  = 14,  hjust = 0))+
   labs(y = "", x = "Effect sizes", alpha = "", color  = "Species pools")
 
-
+pp = ggarrange(p2, p1)
 pdf(here("plot","experimental_effects_species_1.pdf"), height = 8, width = 14)
-ggarrange(p2, p1)
+print(pp)
 dev.off()
 
 p1=
   p.reg%>%
   filter(type %in% c("rate"))%>%
-  filter(typex != "Functional effects")%>%
   mutate(change = ifelse(change == "Distance to origin controls", "In comparison to \norigin controls", "In comparison to \ndestination controls"))%>%
   mutate(change = factor(change, levels = c("In comparison to \norigin controls", "In comparison to \ndestination controls")))%>%
-  ggplot(aes(explanatory, response, color = pool, alpha = pval, group = interaction(var, pool, pval)))+
+  ggplot(aes(explanatory, response, color = pool, alpha = pval, group = interaction(var, pool, pval, experiment)))+
   TP_theme()+
   geom_hline(yintercept = 0, color = "grey20")+
   geom_point(size = 0.8)+
   geom_line(data = regpred%>%
               filter(type %in% c("rate"))%>%
-              filter(typex != "Functional effects")%>%
               mutate(change = ifelse(change == "Distance to origin controls", "In comparison to \norigin controls", "In comparison to \ndestination controls"))%>%
               mutate(change = factor(change, levels = c("In comparison to \norigin controls", "In comparison to \ndestination controls")))
             , aes(explanatory,response,  color = pool, alpha = pval, group = interaction(var, pool, pval)),
@@ -266,7 +309,6 @@ p2=
   filter(term != "intercept")%>%
   filter(pool != "overall")%>%
   filter(type %in% c("rate"))%>%
-  filter(typex != "Functional effects")%>%
   mutate(change = ifelse(change == "Distance to origin controls", "In comparison to \norigin controls", "In comparison to \ndestination controls"))%>%
   mutate(change = factor(change, levels = c("In comparison to \norigin controls", "In comparison to \ndestination controls")))%>%
   ggplot(aes(estimate, var, alpha = pval, label = pval, color = pool))+
@@ -287,8 +329,10 @@ p2=
   labs(y = "", x = "Effect sizes", alpha = "", color  = "Species pools")
 p2
 
-pdf(here("plot","experimental_effects_species_2.pdf"), height = 8, width = 14)
-ggarrange(p2, p1)
+pp = ggarrange(p2, p1)
+
+pdf(here("plot","experimental_effects_species_2.pdf"), height = 8, width = 15)
+print(pp)
 dev.off()
 
 regmod =
@@ -305,11 +349,11 @@ regmod =
                       destPS = "Destination CWM (plant size)",
                       destRA = "Destination CWM (resource acquisition)"))
 
-regmod1 = regmod %>% dplyr::select(change, var, estimate, std.error, statistic,  
+regmod1 = regmod %>% dplyr::select(change, pool, type, var, estimate, std.error, statistic,  
                             conf.low, conf.high, p.value)%>%
   mutate_if(is.numeric, ~ ifelse(is.na(.), NA, round(., 2)))
 
-regmod2 = regmod %>% dplyr::select(change, i.squared, h.squared, tau.squared, tau.squared.se, 
+regmod2 = regmod %>% dplyr::select(change, pool, type, i.squared, h.squared, tau.squared, tau.squared.se, 
                                    cochran.qe, p.value.cochran.qe, cochran.qm, p.value.cochran.qm,
                                    df.residual)%>%distinct()%>%
   mutate_if(is.numeric, ~ ifelse(is.na(.), NA, round(., 2)))
@@ -317,26 +361,42 @@ regmod2 = regmod %>% dplyr::select(change, i.squared, h.squared, tau.squared, ta
 write.csv (regmod1, file = here("output", "regmod1.csv"))
 write.csv (regmod2, file = here("output", "regmod2.csv"))
 
-regsptab =
-  regspmod %>%
-  mutate(var = recode(rowname, 
-                      `(Intercept)` = "Intercept",
-                      PlotSize = "Plot size",
-                      YearRange = "Experiment duration",
-                      cumsumT = "Experimental warming",
-                      destP = "Destination PET",
-                      destT = "Destination temperature",
-                      oriPS = "Origin CWM (plant size)",
-                      oriRA = "Origin CWM (resource acquisition)",
-                      destPS = "Destination CWM (plant size)",
-                      destRA = "Destination CWM (resource acquisition)"))
-regspmod1 = regsptab %>% dplyr::select(change, pool, var, Estimate, `Std. Error`, `t value`,  
-                                `2.5 %`, `97.5 %`, `Pr(>|t|)`)%>%
-  mutate_if(is.numeric, ~ ifelse(is.na(.), NA, round(., 2)))
+# Additional appendix figures ----
 
-regspmod2 = regsptab %>% dplyr::select(change, pool, R, Radj, F.stat, numdf, dendf, p.value)%>%distinct()%>%
-  mutate_if(is.numeric, ~ ifelse(is.na(.), NA, round(., 2)))
+pdf(file = "plot/cwm_differences.pdf", width = 10, height = 8)
+cwm %>%
+  mutate(plant_size = destPS-oriPS,
+         resource_acquisition = destRA-oriRA)%>%
+  dplyr::select(plant_size, resource_acquisition)%>%
+  pivot_longer(cols = plant_size:resource_acquisition)%>%
+  ggplot(aes(name, value))+
+  geom_hline(yintercept = 0, color = "grey50")+
+  TP_theme()+
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.2, fill = "white", outlier.shape = NA, color = "grey50")+
+  labs(x = "", y= "Difference in CWMs between \ndestination and origin controls")
+dev.off()  
 
-write.csv (regspmod1, file = here("output", "regspmod1.csv"))
-write.csv (regspmod2, file = here("output", "regspmod2.csv"))
+# Relative abundance of the outsider species
 
+pdf(file = "plot/relative_abundances_outsiders.pdf", width = 10, height = 8)
+pools%>%
+  dplyr::select(comm_pool)%>%
+  unnest(comm_pool)%>%
+  filter(ODT == "warmed")%>%
+  filter(pool == "outsider")%>%
+  group_by(Region, originSiteID, destSiteID, Year, UniqueID, pool)%>%
+  summarize(tot = sum(Rel_Cover))%>%
+  ggplot(aes(x = tot)) +
+  TP_theme()+
+  geom_histogram(fill = "white", color = "black")+
+  geom_vline(aes(xintercept = mean(tot)), color = "pink", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = median(tot)), color = "red", linetype = "dashed", size = 1) +
+  geom_text(aes(x = mean(tot)+0.07, y = 170, label = sprintf("Mean: %.2f", mean(tot))), vjust = -1.5, color = "pink") +
+  geom_text(aes(x = median(tot)-0.07, y = 170, label = sprintf("Median: %.2f", median(tot))), vjust = 1.5, color = "red") +
+  
+  
+  labs(x = "Relative abundances", y = "Number of warmed communities across all experiments")
+dev.off()
+
+  

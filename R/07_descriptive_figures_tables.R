@@ -1,33 +1,28 @@
 # PRC example experiment ----
-i = 1
-gg1 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = "all", axisx = 1:2, sel.col = c("#ff7f00","#ff0000"))
-gg4 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "all", axisx = 1:2, sel.col = c("#197af6","#ff0000"))
-gg5 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = "reduced_treatment", axisx = 1:2, sel.col = c("#ff0000"))
-gg8 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "reduced_treatment", axisx = 1:2, sel.col = c("#ff0000"))
-
-sp.ex = PRC %>%
-  filter(Region == "NO_Ulvhaugen" & originSiteID == "Ulvhaugen" & destSiteID == "Alrust" & type %in% c("all","reduced_treatment"))%>%
-  dplyr::select(Region, originSiteID, destSiteID, change, type, sp.scores)%>%
-  mutate(p = purrr::map(sp.scores, ~{.} %>%
-                   filter(value > 0.05 | value < -0.05)%>%
-                   mutate(pool = ifelse(pool %in% c("control"), "destination control", pool))%>%
-                   ggplot(aes(x = name, y = value, color = pool))+
-                   geom_hline(yintercept = 0, color = "grey30")+
-                   geom_vline(xintercept = c("RDA1", "RDA2"), color = "grey30")+
-                   TP_theme()+
-                   geom_point()+
-                   geom_text_repel(aes(label = SpeciesName), hjust = 1, direction = "y", nudge_x = 0.5, show.legend = FALSE)+
-                   scale_color_manual(values = c( "#ff7f00", "grey20","grey50","#d25fff","#197af6"))+
-                   labs(y = "Species weights", x = "", color = "")
-  ))
-
-
-pdf(here("plot","ex_experiment.pdf"), height = 15, width = 17)
-pp = (gg1$plot.prc[[i]]+ylab("Canonical coefficients") + sp.ex$p[[1]])/(gg4$plot.prc[[i]]+ylab("Canonical coefficients") + sp.ex$p[[2]])
-print(pp)
-pp = (gg5$plot.prc[[i]]+ylab("Canonical coefficients") + sp.ex$p[[3]])/(gg8$plot.prc[[i]]+ylab("Canonical coefficients") + sp.ex$p[[4]])
-print(pp)
-dev.off()
+# i = 1
+# gg1 = get.PRC.plot(data = PRC, changex = "Distance to origin controls", typex = "all", axisx = 1:2, sel.col = c("#ff7f00","#ff0000"))
+# gg4 = get.PRC.plot(data = PRC, changex = "Distance to destination controls", typex = "all", axisx = 1:2, sel.col = c("#197af6","#ff0000"))
+# 
+# sp.ex = PRC %>%
+#   filter(Region == "NO_Ulvhaugen" & originSiteID == "Ulvhaugen" & destSiteID == "Alrust" & type %in% c("all","reduced_treatment"))%>%
+#   dplyr::select(Region, originSiteID, destSiteID, change, type, sp.scores)%>%
+#   mutate(p = purrr::map(sp.scores, ~{.} %>%
+#                    filter(value > 0.05 | value < -0.05)%>%
+#                    mutate(pool = ifelse(pool %in% c("control"), "destination control", pool))%>%
+#                    ggplot(aes(x = name, y = value, color = pool))+
+#                    geom_hline(yintercept = 0, color = "grey30")+
+#                    geom_vline(xintercept = c("RDA1", "RDA2"), color = "grey30")+
+#                    TP_theme()+
+#                    geom_point()+
+#                    geom_text_repel(aes(label = SpeciesName), hjust = 1, direction = "y", nudge_x = 0.5, show.legend = FALSE)+
+#                    scale_color_manual(values = c( "#ff7f00", "grey20","grey50","#d25fff","#197af6"))+
+#                    labs(y = "Species weights", x = "", color = "")
+#   ))
+# 
+# 
+# pdf(here("plot","ex_experiment.pdf"), height = 15, width = 17)
+# pp = (gg1$plot.prc[[i]]+ylab("Canonical coefficients") + sp.ex$p[[1]])/(gg4$plot.prc[[i]]+ylab("Canonical coefficients") + sp.ex$p[[2]])
+# print(pp)
 
 # Paper Figure 2----
 
@@ -68,7 +63,7 @@ map_data =
 map_data
 
 zoom_to <- c(8.8, 46.3)
-zoom_level <- 5
+zoom_level <- 4
 lon_span <- 360 / 2^zoom_level
 lat_span <- 180 / 2^zoom_level
 
@@ -77,19 +72,20 @@ lat_bounds <- c(zoom_to[2] - lat_span / 2, zoom_to[2] + lat_span / 2)
 
 p2=
   base_world +
-  geom_jitter(data=mapdata, 
-              aes(x=as.numeric(Longitude), y=as.numeric(Latitude), fill = diffT), 
-              pch=21, 
+  geom_jitter(data=mapdata,
+              aes(x=as.numeric(Longitude), y=as.numeric(Latitude), fill = diffT),
+              pch=21,
               alpha=I(0.9),
               stroke = 1,
-              size = 6) + 
+              size = 6) +
   guides(color = "none", fill = "none", size = guide_legend(title.position = "top"))+
-  theme(legend.position="bottom", 
-        legend.text.align = 0) + # omit plot title saying 'color'
+  theme(legend.position="bottom",
+        legend.text.align = 0) +
   scale_fill_gradient(low = "grey90", high = "#CD0000")+
   coord_sf(xlim = lon_bounds, ylim = lat_bounds)+
   scale_size_manual(values = c(1:9)*1.5)
 p2
+
 zoom_to <- c(6.2, 60.8)
 zoom_level <- 5
 lon_span <- 360 / 2^zoom_level
@@ -110,7 +106,7 @@ p3 =
   theme(legend.position="bottom", 
         legend.text.align = 0) + # omit plot title saying 'color'
   scale_fill_gradient(low = "grey90", high = "#CD0000")+
-  coord_sf(xlim = lon_bounds, ylim = lat_bounds)+
+  coord_cartesian(xlim = lon_bounds, ylim = lat_bounds)+
   scale_size_manual(values = c(1:9)*1.5)
 p3
 

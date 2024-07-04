@@ -59,6 +59,17 @@ cleanedspecies = cleanedspecies %>%
   filter(!(SpeciesName == "Sal gla" & matched_name == "Salix glauca glauca"))%>%
   filter(!(SpeciesName == "Ver alp" & matched_name == "Veronica alpina subsp. alpina"))
 
+# Get the number of species
+cleanedspecies %>%
+  filter(!is.na(matched_name))%>%
+  dplyr::select(matched_name)%>%
+  distinct(matched_name)%>%
+  filter(!grepl("_NID_", matched_name))%>%
+  mutate(word_count = str_count(matched_name, "\\S+")) %>%
+  group_by(word_count) %>%
+  summarize(count = n())
+
+
 df = df %>%
   left_join(cleanedspecies %>% 
               dplyr::select(Region, destSiteID, SpeciesName, matched_name) %>% 
@@ -152,17 +163,23 @@ sum.pools = pools %>%
   group_by(Region, originSiteID, destSiteID)%>%
   mutate_at(vars(low:warmed_colonizer), ~ purrr::map(., length))%>%
   unnest(low:warmed_colonizer)%>%
-  mutate_at(vars(high_unique:colonizer), ~(./total)*100)
+  mutate_at(vars(high_unique:colonizer, -total), ~(./total)*100)%>%
+  dplyr::select(Region, originSiteID, destSiteID, high_unique, overlap, colonizer, outsider, total)
 
-sum.pools = sum.pools %>%
-  dplyr::select(Region, originSiteID, destSiteID, high_unique, overlap, colonizer)%>%
-  pivot_longer(cols = high_unique:colonizer, names_to = "pools")%>%
+write.csv(sum.pools %>%
+            mutate_at(vars(high_unique:outsider), ~ round(.)), "output/species.pools.csv")
+
+sum.pools =
+  sum.pools%>%
+  pivot_longer(cols = high_unique:outsider, names_to = "pools")%>%
   mutate(pools = recode(pools, colonizer = "Colonizing \nspecies pool",
                         high_unique = "Strictly high-elevation \nspecies pool",
-                        overlap = "Overlapping \nspecies pool"))%>%
+                        overlap = "Overlapping \nspecies pool",
+                        outsider = "Outsider"))%>%
   mutate(pools = factor(pools, levels = c("Overlapping \nspecies pool", 
                                           "Strictly high-elevation \nspecies pool", 
-                                          "Colonizing \nspecies pool")))%>%
+                                          "Colonizing \nspecies pool",
+                                          "Outsider")))%>%
   filter(Region != "US_Arizona")
 
 # Anova
@@ -176,8 +193,8 @@ pp= ggplot(sum.pools, aes(pools, value))+
   TP_theme()+
   geom_boxplot(aes(color = pools), show.legend = FALSE)+
   geom_jitter(aes(color = pools), show.legend = FALSE)+
-  geom_bracket(data = comp, aes(xmin = xmin, xmax = xmax, y.position = c(120, 100, 90), label = paste0("p.value = ",round(p.value, 3))))+
-  scale_color_manual( values = c("#d25fff","#197af6","#ff7f00"))+
+  geom_bracket(data = comp, aes(xmin = xmin, xmax = xmax, y.position = c(130, 120, 110, 100, 90, 80), label = paste0("p.value = ",round(p.value, 3))))+
+  scale_color_manual( values = c("#d25fff","#197af6","#ff7f00","grey"))+
   labs(x = "Species pools", y = "Percentage of species pool per experiment")
 print(pp)
 dev.off()
@@ -212,20 +229,40 @@ tr =
   mutate_at(.vars = c("height","SLA","LA","N_percent","C_percent","P_percent","seed_mass"), log) %>%
   mutate_at(.vars = c("height","SLA","LA","N_percent","C_percent","P_percent","seed_mass"), scale, center = TRUE, scale = TRUE)%>%
   mutate_at(.vars = c("height","SLA","LA","N_percent","C_percent","P_percent","seed_mass"), as.numeric)%>%
-  distinct()
+  distinct()%>%
+  filter(!grepl("_NID_", SpeciesName))%>%
+  filter(!is.na(SpeciesName))
 
 # Fill in the trait gaps with miceRanger algorithm
-nb.NA = tr %>% summarise_all(~ 100-round(sum(is.na(.))/length(.),2)*100)
+nb.NA = tr %>% summarise_all(~ round(sum(is.na(.))/length(.),2)*100)
 print(nb.NA)
-matLong = tr[, c(-1)]
+matLong = tr %>%
+  dplyr::select(SpeciesName, height, SLA, LA, N_percent, seed_mass)%>%
+  mutate(genus = word(SpeciesName, 1))%>%
+  dplyr::select(-SpeciesName)
+
+matchlist = list(height = c("LA","seed_mass","genus")
+                , SLA = c("N_percent", "genus")
+                , LA = c("height","seed_mass", "SLA","N_percent")
+                , N_percent = c("SLA", "genus")
+                , seed_mass = c("LA","height","genus"))
+set.seed(nseed)
 mrMeanMatch = miceRanger(matLong
-                         , m = 10
+                         , m = ndataset
+                         , maxiter = niteration
+                         , vars = matchlist
                          , valueSelector = "meanMatch"
                          , returnModels = TRUE
                          , verbose = FALSE)
-matLong_pred = as_tibble(completeData(mrMeanMatch)[[1]])
+plotDistributions(mrMeanMatch)
+tr =
+  completeData(mrMeanMatch)%>%
+  map_df(~bind_cols(.x, tr %>% dplyr::select(SpeciesName)), .id = "dataset_id")%>%
+  group_by(genus, SpeciesName)%>%
+  summarise(across(height:seed_mass, mean))%>%
+  ungroup()%>%
+  dplyr::select(-genus)
 
-tr = bind_cols(tr %>% dplyr::select(SpeciesName), matLong_pred)
 nb.NA = tr %>% summarise_all(~ 100-round(sum(is.na(.))/length(.),2)*100)
 print(nb.NA)
 
@@ -237,13 +274,14 @@ ncomp=paran(tr %>% dplyr::select(height, LA, SLA, seed_mass, N_percent), iterati
             col = c("black", "red", "blue"), lty = c(1, 2, 3), lwd = 1, legend = TRUE, 
             file = "", width = 640, height = 640, grdevice = "png", seed = 0)$Retained
 
-res.pca = PCA(tr %>% dplyr::select(height, LA, SLA, seed_mass, N_percent), ncp = ncomp, scale.unit = TRUE)
+res.pca = PCA(tr %>% dplyr::select(height, SLA, LA, seed_mass, N_percent), ncp = ncomp, scale.unit = TRUE)
 
 pdf("plot/species_traits_pca.pdf", height = 6, width = 8)
 fviz_pca_biplot(res.pca,
                 geom ="point",
                 col.var = "black",
-                col.ind = "grey50")+
+                col.ind = "grey50",
+                repel = TRUE)+
   labs(x = paste0("PC1 (",round(get_eigenvalue(res.pca)[1,2], 2), "%)"),
        y = paste0("PC2 (",round(get_eigenvalue(res.pca)[2,2], 2), "%)"),
        title = "")+
@@ -252,7 +290,7 @@ fviz_pca_biplot(res.pca,
   coord_equal()
 dev.off()
 
-print(res.pca$var$contrib)
+print(round(res.pca$var$contrib))
 
 tr =
   tr %>%
